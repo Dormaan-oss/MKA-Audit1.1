@@ -1,15 +1,22 @@
-const CACHE = 'mka-kurzaudit-v1';
+const CACHE = 'mka-kurzaudit-v2';
 const FILES = [
   './',
   './index.html',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/favicon.png'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(FILES))
+    caches.open(CACHE).then(cache => {
+      return Promise.all(
+        FILES.map(url =>
+          fetch(url).then(r => cache.put(url, r)).catch(() => {})
+        )
+      );
+    })
   );
   self.skipWaiting();
 });
@@ -25,6 +32,14 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(response => {
+        if (!response || response.status !== 200) return response;
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, copy));
+        return response;
+      }).catch(() => caches.match('./index.html'));
+    })
   );
 });

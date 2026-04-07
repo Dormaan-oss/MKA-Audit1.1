@@ -345,7 +345,7 @@
 
 </div>
 <script>
-let questions = {
+const DEFAULT_QUESTIONS = {
   mitarbeiter: [
     "Trägt der Mitarbeiter die vorgeschriebene PSA?",
     "Ist der Arbeitsplatz sauber und aufgeräumt?",
@@ -362,6 +362,19 @@ let questions = {
     "Wurden Qualitätskontrollen durchgeführt?"
   ]
 };
+
+function loadQuestions() {
+  try {
+    const saved = localStorage.getItem('mka_questions');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_QUESTIONS));
+}
+function saveQuestions() {
+  try { localStorage.setItem('mka_questions', JSON.stringify(questions)); } catch(e) {}
+}
+
+let questions = loadQuestions();
 
 const STATUS_CYCLE = [null,'green','yellow','red'];
 const STATUS_CONFIG = {
@@ -425,9 +438,9 @@ function renderSettings() {
 }
 function startEdit(i){editingIdx=i;renderSettings();}
 function cancelEdit(){editingIdx=-1;renderSettings();}
-function saveEdit(i){const v=document.getElementById('edit-input-'+i).value.trim();if(!v)return;questions[editRole][i]=v;editingIdx=-1;renderSettings();}
-function deleteQuestion(i){questions[editRole].splice(i,1);if(editingIdx===i)editingIdx=-1;renderSettings();}
-function addQuestion(){const inp=document.getElementById('new-q-input');const v=inp.value.trim();if(!v)return;questions[editRole].push(v);inp.value='';renderSettings();}
+function saveEdit(i){const v=document.getElementById('edit-input-'+i).value.trim();if(!v)return;questions[editRole][i]=v;editingIdx=-1;saveQuestions();renderSettings();}
+function deleteQuestion(i){questions[editRole].splice(i,1);if(editingIdx===i)editingIdx=-1;saveQuestions();renderSettings();}
+function addQuestion(){const inp=document.getElementById('new-q-input');const v=inp.value.trim();if(!v)return;questions[editRole].push(v);inp.value='';saveQuestions();renderSettings();}
 
 function startAudit(){
   if(questions[currentRole].length===0){alert('Keine Fragen vorhanden.');return;}
@@ -517,11 +530,13 @@ function esc(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').
 renderHome();
 </script>
 <script>
-if('serviceWorker' in navigator){
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then(() => console.log('SW registered'))
-      .catch(e => console.log('SW error', e));
+    // Detect base path for GitHub Pages compatibility
+    const base = window.location.pathname.replace(/\/[^\/]*$/, '/');
+    navigator.serviceWorker.register(base + 'sw.js', { scope: base })
+      .then(reg => console.log('SW registered, scope:', reg.scope))
+      .catch(e => console.warn('SW failed:', e));
   });
 }
 </script>
