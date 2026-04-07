@@ -1,0 +1,25 @@
+{
+  "name": "MKA Kurzaudit",
+  "short_name": "Kurzaudit",
+  "description": "Mehrschichtiges Audit-System für Mitarbeiter und Schichtführer",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1d2c45",
+  "theme_color": "#1d2c45",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
