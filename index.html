@@ -225,6 +225,10 @@
         <div class="stat-num" id="home-count">0</div>
         <div id="home-role-label" style="font-size:13px;color:var(--muted);margin-top:3px">Mitarbeiter-Fragen</div>
       </div>
+      <div>
+        <div class="label">Name des Auditierten</div>
+        <input type="text" id="auditee-name-input" placeholder="Name des Mitarbeiters / Schichtführers...">
+      </div>
       <button class="btn btn-primary" style="font-size:17px;padding:18px" onclick="startAudit()">▶ Audit starten</button>
       <button class="btn btn-secondary" onclick="goTo('settings')">⚙ Einstellungen / Fragen bearbeiten</button>
     </div>
@@ -237,6 +241,10 @@
       <span style="margin-left:auto;font-size:12px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.08em">Einstellungen</span>
     </div>
     <div class="body">
+      <div>
+        <div class="label">Mein Name (Prüfer)</div>
+        <input type="text" id="auditor-name-input" placeholder="Vor- und Nachname eingeben..." oninput="saveAuditorName()">
+      </div>
       <div>
         <div class="label">Fragenkatalog bearbeiten</div>
         <div class="role-row">
@@ -373,6 +381,15 @@ function loadQuestions() {
 function saveQuestions() {
   try { localStorage.setItem('mka_questions', JSON.stringify(questions)); } catch(e) {}
 }
+function loadAuditorName() {
+  try { return localStorage.getItem('mka_auditor_name') || ''; } catch(e) { return ''; }
+}
+function saveAuditorName() {
+  try {
+    const v = document.getElementById('auditor-name-input').value;
+    localStorage.setItem('mka_auditor_name', v);
+  } catch(e) {}
+}
 
 let questions = loadQuestions();
 
@@ -412,6 +429,7 @@ function selectEditRole(role) {
   renderSettings();
 }
 function renderSettings() {
+  document.getElementById('auditor-name-input').value = loadAuditorName();
   const list=document.getElementById('settings-list');
   const qs=questions[editRole];
   if(qs.length===0){list.innerHTML='<div class="empty-hint">Keine Fragen vorhanden.</div>';return;}
@@ -520,6 +538,10 @@ function renderTable(){
     const collected=longComments.map(c=>`(${c.nr}) ${c.text}`).join('  ');
     tsv+='\nBemerkungen:  '+collected;
   }
+  const auditorName = loadAuditorName().trim();
+  const auditeeName = (document.getElementById('auditee-name-input').value||'').trim();
+  if(auditorName) tsv+='\nPrüfer:  '+auditorName;
+  if(auditeeName) tsv+='\nAuditierter:  '+auditeeName;
   const el=document.getElementById('tsv-output');
   el.value=tsv;
   el.style.height='auto';
