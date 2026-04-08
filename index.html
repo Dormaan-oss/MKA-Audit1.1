@@ -226,6 +226,12 @@
         <div id="home-role-label" style="font-size:13px;color:var(--muted);margin-top:3px">Mitarbeiter-Fragen</div>
       </div>
       <div>
+        <div class="label">Arbeitsplatz</div>
+        <select id="workplace-select" style="width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:15px;padding:13px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7a94' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 13px center;">
+          <option value="">– Kein Arbeitsplatz –</option>
+        </select>
+      </div>
+      <div>
         <div class="label">Name des Auditierten</div>
         <input type="text" id="auditee-name-input" placeholder="Name des Mitarbeiters / Schichtführers...">
       </div>
@@ -258,6 +264,17 @@
         <div class="new-q-row">
           <input type="text" id="new-q-input" placeholder="Neue Frage eingeben..." onkeydown="if(event.key==='Enter') addQuestion()">
           <button class="btn btn-primary" onclick="addQuestion()">+ Hinzufügen</button>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div class="label">Arbeitsplätze verwalten</div>
+        <div class="card-flat" id="workplace-list"></div>
+        <div style="margin-top:12px">
+          <div class="label">Neuen Arbeitsplatz hinzufügen</div>
+          <div class="new-q-row">
+            <input type="text" id="new-wp-input" placeholder="Arbeitsplatz eingeben..." onkeydown="if(event.key==='Enter') addWorkplace()">
+            <button class="btn btn-primary" onclick="addWorkplace()">+ Hinzufügen</button>
+          </div>
         </div>
       </div>
     </div>
@@ -390,6 +407,56 @@ function saveAuditorName() {
     localStorage.setItem('mka_auditor_name', v);
   } catch(e) {}
 }
+function loadWorkplaces() {
+  try {
+    const saved = localStorage.getItem('mka_workplaces');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return [];
+}
+function saveWorkplaces() {
+  try { localStorage.setItem('mka_workplaces', JSON.stringify(workplaces)); } catch(e) {}
+}
+
+let workplaces = loadWorkplaces();
+let editingWpIdx = -1;
+
+function renderWorkplaces() {
+  const list = document.getElementById('workplace-list');
+  if (!list) return;
+  if (workplaces.length === 0) { list.innerHTML = '<div class="empty-hint">Keine Arbeitsplätze vorhanden.</div>'; return; }
+  list.innerHTML = workplaces.map((wp, i) => {
+    if (editingWpIdx === i) {
+      return `<div class="q-item"><div class="q-edit-row">
+        <input type="text" id="edit-wp-input-${i}" value="${esc(wp)}" onkeydown="if(event.key==='Enter') saveEditWp(${i})">
+        <div class="edit-actions">
+          <button class="btn-sm-save" onclick="saveEditWp(${i})">✓ Speichern</button>
+          <button class="btn-ghost" onclick="cancelEditWp()">Abbrechen</button>
+        </div>
+      </div></div>`;
+    }
+    return `<div class="q-item">
+      <span class="q-num">${i+1}.</span>
+      <span class="q-text">${esc(wp)}</span>
+      <div class="q-actions">
+        <button class="btn-ghost" onclick="startEditWp(${i})" style="font-size:17px;padding:4px 8px">✏</button>
+        <button class="btn-sm-danger" onclick="deleteWorkplace(${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  if (editingWpIdx >= 0) setTimeout(() => { const el = document.getElementById('edit-wp-input-' + editingWpIdx); if(el){el.focus();el.select();} }, 50);
+}
+function startEditWp(i) { editingWpIdx = i; renderWorkplaces(); }
+function cancelEditWp() { editingWpIdx = -1; renderWorkplaces(); }
+function saveEditWp(i) { const v = document.getElementById('edit-wp-input-' + i).value.trim(); if(!v) return; workplaces[i] = v; editingWpIdx = -1; saveWorkplaces(); renderWorkplaces(); renderHomeWorkplaces(); }
+function deleteWorkplace(i) { workplaces.splice(i, 1); if(editingWpIdx === i) editingWpIdx = -1; saveWorkplaces(); renderWorkplaces(); renderHomeWorkplaces(); }
+function addWorkplace() { const inp = document.getElementById('new-wp-input'); const v = inp.value.trim(); if(!v) return; workplaces.push(v); inp.value = ''; saveWorkplaces(); renderWorkplaces(); renderHomeWorkplaces(); }
+function renderHomeWorkplaces() {
+  const sel = document.getElementById('workplace-select');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">– Kein Arbeitsplatz –</option>' + workplaces.map(wp => `<option value="${esc(wp)}"${cur===wp?' selected':''}>${esc(wp)}</option>`).join('');
+}
 
 let questions = loadQuestions();
 
@@ -420,6 +487,7 @@ function renderHome() {
   document.getElementById('home-btn-sf').className='role-btn'+(currentRole==='schichtfuehrer'?' active':'');
   document.getElementById('home-count').textContent=questions[currentRole].length;
   document.getElementById('home-role-label').textContent=currentRole==='mitarbeiter'?'Mitarbeiter-Fragen':'Schichtführer-Fragen';
+  renderHomeWorkplaces();
 }
 
 function selectEditRole(role) {
@@ -430,8 +498,7 @@ function selectEditRole(role) {
 }
 function renderSettings() {
   document.getElementById('auditor-name-input').value = loadAuditorName();
-  const list=document.getElementById('settings-list');
-  const qs=questions[editRole];
+  const list=document.getElementById('settings-list');  const qs=questions[editRole];
   if(qs.length===0){list.innerHTML='<div class="empty-hint">Keine Fragen vorhanden.</div>';return;}
   list.innerHTML=qs.map((q,i)=>{
     if(editingIdx===i){
@@ -453,6 +520,7 @@ function renderSettings() {
     </div>`;
   }).join('');
   if(editingIdx>=0) setTimeout(()=>{const el=document.getElementById('edit-input-'+editingIdx);if(el){el.focus();el.select();}},50);
+  renderWorkplaces();
 }
 function startEdit(i){editingIdx=i;renderSettings();}
 function cancelEdit(){editingIdx=-1;renderSettings();}
@@ -540,8 +608,10 @@ function renderTable(){
   }
   const auditorName = loadAuditorName().trim();
   const auditeeName = (document.getElementById('auditee-name-input').value||'').trim();
-  if(auditorName) tsv+='\nPrüfer:  '+auditorName;
-  if(auditeeName) tsv+='\nAuditierter:  '+auditeeName;
+  const workplace = (document.getElementById('workplace-select').value||'').trim();
+  if(auditorName) tsv+='\n'+auditorName;
+  if(auditeeName) tsv+='\n'+auditeeName;
+  if(workplace) tsv+='\n'+workplace;
   const el=document.getElementById('tsv-output');
   el.value=tsv;
   el.style.height='auto';
