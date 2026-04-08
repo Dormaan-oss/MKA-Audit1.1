@@ -1,4 +1,4 @@
-const CACHE = 'mka-kurzaudit-v2';
+const CACHE = 'mka-kurzaudit-v3';
 const FILES = [
   './',
   './index.html',
