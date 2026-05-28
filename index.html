@@ -1116,9 +1116,49 @@ function exportPDF() {
 </body>
 </html>`;
 
-  const w = window.open('','_blank','width=1100,height=700');
-  if(!w){ alert('Bitte Pop-ups für diese Seite erlauben, um den PDF-Export zu nutzen.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  // iOS/iPad-Erkennung (inkl. iPadOS 13+ das sich als MacIntel tarnt)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  if (isIOS) {
+    // iOS/iPad: window.open() wird im PWA-Modus blockiert → iframe-Overlay
+    const toolbar = `
+<style>
+  #pdf-toolbar{
+    position:fixed;top:0;left:0;right:0;z-index:9999;
+    background:#1d2c45;padding:10px 16px;
+    display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 2px 8px rgba(0,0,0,.35);gap:8px;
+  }
+  #pdf-toolbar-title{color:#fff;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;flex:1;}
+  .pdf-tbtn{
+    border:none;border-radius:8px;padding:9px 14px;
+    font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;
+  }
+  .pdf-tbtn-save{background:#1a8a4a;color:#fff;}
+  .pdf-tbtn-close{background:rgba(255,255,255,.15);color:#fff;}
+  body{padding-top:56px!important;}
+</style>
+<div id="pdf-toolbar">
+  <span id="pdf-toolbar-title">📄 Audit-Report</span>
+  <button class="pdf-tbtn pdf-tbtn-save" onclick="window.print()">🖨️ Als PDF speichern</button>
+  <button class="pdf-tbtn pdf-tbtn-close" onclick="parent.document.getElementById('mka-pdf-frame').remove()">✕ Schließen</button>
+</div>`;
+
+    const iosHtml = html.replace('</body>', toolbar + '\n</body>');
+
+    const frame = document.createElement('iframe');
+    frame.id = 'mka-pdf-frame';
+    frame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9998;border:none;background:#fff;';
+    frame.srcdoc = iosHtml;
+    document.body.appendChild(frame);
+
+  } else {
+    // Desktop/Android: bisheriger Popup-Ansatz
+    const w = window.open('','_blank','width=1100,height=700');
+    if(!w){ alert('Bitte Pop-ups für diese Seite erlauben, um den PDF-Export zu nutzen.'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
 }
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
