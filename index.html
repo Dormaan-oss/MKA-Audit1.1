@@ -1116,48 +1116,46 @@ function exportPDF() {
 </body>
 </html>`;
 
-  // iOS/iPad-Erkennung (inkl. iPadOS 13+ das sich als MacIntel tarnt)
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  // Toolbar in den Report einbauen (ersetzt auto-print, klappt in Chrome + Safari)
+  const reportHtml = html
+    .replace('<script>window.onload=function(){window.print();}<\/script>',
+      `<style>
+        #pdf-bar{
+          position:fixed;top:0;left:0;right:0;background:#1d2c45;
+          padding:10px 14px;display:flex;align-items:center;
+          justify-content:space-between;gap:8px;z-index:9999;
+          box-shadow:0 2px 8px rgba(0,0,0,.3);
+        }
+        #pdf-bar-hint{color:rgba(255,255,255,.7);font-family:-apple-system,sans-serif;font-size:12px;flex:1;}
+        .pb-btn{border:none;border-radius:8px;padding:9px 14px;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
+        .pb-print{background:#1a8a4a;color:#fff;}
+        body{padding-top:54px!important;}
+        @media print{#pdf-bar{display:none!important;}body{padding-top:0!important;}}
+      <\/style>
+      <div id="pdf-bar">
+        <span id="pdf-bar-hint">\u2B06 Tipp: Browser-Men\u00FC \"Teilen\" oder \"Drucken\" \u2192 Als PDF speichern</span>
+        <button class="pb-btn pb-print" onclick="window.print()">\uD83D\uDDA8 Drucken / PDF</button>
+      </div>
+      <script>if(typeof window.print==='function'&&!/CriOS|FxiOS/.test(navigator.userAgent)){window.onload=function(){setTimeout(function(){window.print();},400);}}<\/script>`
+    );
 
-  if (isIOS) {
-    // iOS/iPad: window.open() wird im PWA-Modus blockiert → iframe-Overlay
-    const toolbar = `
-<style>
-  #pdf-toolbar{
-    position:fixed;top:0;left:0;right:0;z-index:9999;
-    background:#1d2c45;padding:10px 16px;
-    display:flex;align-items:center;justify-content:space-between;
-    box-shadow:0 2px 8px rgba(0,0,0,.35);gap:8px;
-  }
-  #pdf-toolbar-title{color:#fff;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;flex:1;}
-  .pdf-tbtn{
-    border:none;border-radius:8px;padding:9px 14px;
-    font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;
-  }
-  .pdf-tbtn-save{background:#1a8a4a;color:#fff;}
-  .pdf-tbtn-close{background:rgba(255,255,255,.15);color:#fff;}
-  body{padding-top:56px!important;}
-</style>
-<div id="pdf-toolbar">
-  <span id="pdf-toolbar-title">📄 Audit-Report</span>
-  <button class="pdf-tbtn pdf-tbtn-save" onclick="window.print()">🖨️ Als PDF speichern</button>
-  <button class="pdf-tbtn pdf-tbtn-close" onclick="parent.document.getElementById('mka-pdf-frame').remove()">✕ Schließen</button>
-</div>`;
+  const blob = new Blob([reportHtml], {type:'text/html;charset=utf-8'});
+  const blobUrl = URL.createObjectURL(blob);
 
-    const iosHtml = html.replace('</body>', toolbar + '\n</body>');
+  const w = window.open(blobUrl, '_blank');
 
+  if (!w) {
     const frame = document.createElement('iframe');
     frame.id = 'mka-pdf-frame';
     frame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9998;border:none;background:#fff;';
-    frame.srcdoc = iosHtml;
+    frame.src = blobUrl;
     document.body.appendChild(frame);
 
-  } else {
-    // Desktop/Android: bisheriger Popup-Ansatz
-    const w = window.open('','_blank','width=1100,height=700');
-    if(!w){ alert('Bitte Pop-ups für diese Seite erlauben, um den PDF-Export zu nutzen.'); return; }
-    w.document.open(); w.document.write(html); w.document.close();
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '\u2715 Schlie\u00DFen';
+    closeBtn.style.cssText = 'position:fixed;top:10px;left:14px;z-index:9999;background:#c41e22;border:none;border-radius:8px;padding:9px 14px;color:#fff;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;cursor:pointer;';
+    closeBtn.onclick = function(){ frame.remove(); closeBtn.remove(); URL.revokeObjectURL(blobUrl); };
+    document.body.appendChild(closeBtn);
   }
 }
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
