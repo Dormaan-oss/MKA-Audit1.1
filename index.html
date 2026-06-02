@@ -369,7 +369,7 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
       <div style="padding:14px 18px 8px"><div class="label" style="margin-bottom:0">Übersicht</div></div>
       <div id="result-list"></div>
     </div>
-    <button class="btn btn-primary" style="font-size:15px;padding:17px" onclick="exportPDF()">📄 PDF-Report exportieren</button>
+    <button id="screenshot-btn" class="btn btn-primary" style="font-size:15px;padding:17px" onclick="takeScreenshot()">📸 Screenshot speichern</button>
     <button class="btn btn-primary" style="font-size:15px;padding:17px" onclick="goTo('table')">📊 Tabelle für Excel anzeigen</button>
     <button class="btn btn-secondary" onclick="goTo('home', true)">↩ Neues Audit starten</button>
   </div>
@@ -884,278 +884,55 @@ function renderResult() {
   }).join('');
 }
 
-/* ============================================================
-   PDF EXPORT
-============================================================ */
-function exportPDF() {
-  const s         = getOUS(currentOU.id);
-  const qs        = s.questions[currentRole]||[];
-  const auditor   = (document.getElementById('auditor-select').value||'').trim();
-  const auditee   = (document.getElementById('auditee-name-input').value||'').trim();
-  const workplace = (document.getElementById('workplace-select').value||'').trim();
-  const roleName  = s.roleNames[currentRole]||currentRole;
-  const now       = new Date();
-  const dateStr   = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const timeStr   = now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+function takeScreenshot() {
+  const btn = document.getElementById('screenshot-btn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳ Wird erstellt…';
+  btn.disabled = true;
 
-  let cntG=0,cntY=0,cntR=0,cntN=0;
-  answers.forEach(a=>{
-    if(a.status==='green')       cntG++;
-    else if(a.status==='yellow') cntY++;
-    else if(a.status==='red')    cntR++;
-    else                          cntN++;
-  });
-  const total = qs.length;
-  const score = total>0 ? Math.round((cntG/total)*100) : 0;
-
-  const statusCfg = {
-    null:   {label:'Nicht bewertet', bg:'#f0f2f5', color:'#6b7a94', dot:'#c8cdd8'},
-    green:  {label:'In Ordnung',     bg:'#e6f9ee', color:'#1a7a40', dot:'#1a8a4a'},
-    yellow: {label:'Auffällig',      bg:'#fff8e1', color:'#8a6000', dot:'#e6a800'},
-    red:    {label:'Mangelhaft',     bg:'#fdecea', color:'#a01a1a', dot:'#c41e22'},
-  };
-
-  const rows = qs.map((q,i)=>{
-    const a   = answers[i];
-    const key = a.status||null;
-    const cfg = statusCfg[key];
-    return `<tr>
-      <td class="nr">${i+1}</td>
-      <td class="qtext">${escHtml(q)}</td>
-      <td class="status" style="background:${cfg.bg};color:${cfg.color}">
-        <span class="dot" style="background:${cfg.dot}"></span>${cfg.label}
-      </td>
-      <td class="comment">${a.comment ? escHtml(a.comment) : '<span class="no-comment">–</span>'}</td>
-    </tr>`;
-  }).join('');
-
-  const gaugeColor = score>=80 ? '#1a8a4a' : score>=50 ? '#e6a800' : '#c41e22';
-
-  const html = `<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Kurzaudit – ${escHtml(currentOU.name)} – ${dateStr}</title>
-<style>
-  @page { size: A4 landscape; margin: 12mm 14mm; }
-  *{ box-sizing:border-box; margin:0; padding:0; }
-  body{ font-family:'Segoe UI',Arial,sans-serif; font-size:10pt; color:#1a2236; background:#fff; }
-
-  /* ── HEADER ── */
-  .page-header{
-    display:flex; align-items:center; justify-content:space-between;
-    border-bottom:3px solid #003366; padding-bottom:8px; margin-bottom:10px;
-  }
-  .header-left{ display:flex; align-items:center; gap:12px; }
-  .ou-badge{
-    background:#003366; color:#fff; border-radius:8px;
-    padding:6px 14px; font-size:15pt; font-weight:700; letter-spacing:.02em;
-  }
-  .ou-sub{ font-size:9pt; color:#6b7a94; margin-top:2px; }
-  .header-right{ text-align:right; font-size:8.5pt; color:#6b7a94; line-height:1.7; }
-  .header-right strong{ color:#1a2236; }
-
-  /* ── META ROW ── */
-  .meta-row{
-    display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10px;
-  }
-  .meta-card{
-    background:#f4f6fa; border-radius:6px; padding:7px 10px;
-    border-left:3px solid #003366;
-  }
-  .meta-label{ font-size:7.5pt; color:#6b7a94; text-transform:uppercase; letter-spacing:.07em; }
-  .meta-value{ font-size:10pt; font-weight:600; color:#1a2236; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-  /* ── SUMMARY ROW ── */
-  .summary-row{
-    display:grid; grid-template-columns:1fr 1fr 1fr 1fr 120px; gap:8px; margin-bottom:12px; align-items:stretch;
-  }
-  .stat-card{
-    border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; justify-content:center;
-  }
-  .stat-card .num{ font-size:22pt; font-weight:700; line-height:1; }
-  .stat-card .lbl{ font-size:8pt; margin-top:3px; font-weight:500; }
-  .stat-green{ background:#e6f9ee; color:#1a7a40; border:1.5px solid #1a8a4a; }
-  .stat-yellow{ background:#fff8e1; color:#8a6000; border:1.5px solid #e6a800; }
-  .stat-red{ background:#fdecea; color:#a01a1a; border:1.5px solid #c41e22; }
-  .stat-grey{ background:#f0f2f5; color:#6b7a94; border:1.5px solid #c8cdd8; }
-
-  /* Score gauge (simple circle via CSS border) */
-  .gauge-card{
-    background:#f4f6fa; border-radius:8px; display:flex;
-    flex-direction:column; align-items:center; justify-content:center;
-    border:1.5px solid #dde1e8; padding:6px;
-  }
-  .gauge-circle{
-    width:62px; height:62px; border-radius:50%;
-    border:6px solid ${gaugeColor};
-    display:flex; align-items:center; justify-content:center;
-    font-size:14pt; font-weight:700; color:${gaugeColor};
-  }
-  .gauge-lbl{ font-size:7.5pt; color:#6b7a94; margin-top:4px; text-align:center; }
-
-  /* ── TABLE ── */
-  table{ width:100%; border-collapse:collapse; font-size:9pt; }
-  thead tr{ background:#003366; color:#fff; }
-  thead th{
-    padding:6px 10px; text-align:left; font-weight:600;
-    font-size:8pt; text-transform:uppercase; letter-spacing:.06em;
-  }
-  thead th.nr{ width:36px; text-align:center; }
-  thead th.status{ width:120px; }
-  thead th.comment{ width:28%; }
-  tbody tr:nth-child(even){ background:#f7f8fb; }
-  tbody tr{ border-bottom:1px solid #eaecf2; page-break-inside:avoid; }
-  td{ padding:5px 10px; vertical-align:top; line-height:1.4; }
-  td.nr{ text-align:center; color:#6b7a94; font-weight:600; }
-  td.status{
-    font-weight:600; font-size:8.5pt; border-radius:0;
-    white-space:nowrap; vertical-align:middle;
-    display:table-cell;
-  }
-  td.comment{ color:#4a5568; font-size:8.5pt; }
-  .no-comment{ color:#b0b8c8; }
-  span.dot{
-    display:inline-block; width:7px; height:7px;
-    border-radius:50%; margin-right:5px; vertical-align:middle;
-  }
-
-  /* ── FOOTER ── */
-  .page-footer{
-    margin-top:12px; border-top:1.5px solid #dde1e8; padding-top:6px;
-    display:flex; justify-content:space-between; font-size:7.5pt; color:#a0a8b8;
-  }
-  .section-title{
-    font-size:8pt; font-weight:700; text-transform:uppercase;
-    letter-spacing:.08em; color:#003366; margin-bottom:5px;
-  }
-</style>
-</head>
-<body>
-
-<!-- HEADER -->
-<div class="page-header">
-  <div class="header-left">
-    <div class="ou-badge">${escHtml(currentOU.icon||'🏭')} ${escHtml(currentOU.name)}</div>
-    <div>
-      <div style="font-size:13pt;font-weight:700">Kurzaudit</div>
-      <div class="ou-sub">${escHtml(roleName)}</div>
-    </div>
-  </div>
-  <div class="header-right">
-    <div><strong>Datum:</strong> ${dateStr} &nbsp;|&nbsp; <strong>Uhrzeit:</strong> ${timeStr}</div>
-    <div><strong>Organisationseinheit:</strong> ${escHtml(currentOU.name)}</div>
-  </div>
-</div>
-
-<!-- META -->
-<div class="meta-row">
-  <div class="meta-card">
-    <div class="meta-label">Prüfer</div>
-    <div class="meta-value">${auditor||'–'}</div>
-  </div>
-  <div class="meta-card">
-    <div class="meta-label">Auditierter Mitarbeiter</div>
-    <div class="meta-value">${auditee||'–'}</div>
-  </div>
-  <div class="meta-card">
-    <div class="meta-label">Arbeitsplatz</div>
-    <div class="meta-value">${workplace||'–'}</div>
-  </div>
-  <div class="meta-card">
-    <div class="meta-label">Rolle</div>
-    <div class="meta-value">${escHtml(roleName)}</div>
-  </div>
-</div>
-
-<!-- SUMMARY -->
-<div class="summary-row">
-  <div class="stat-card stat-green">
-    <div class="num">${cntG}</div>
-    <div class="lbl">✓ In Ordnung</div>
-  </div>
-  <div class="stat-card stat-yellow">
-    <div class="num">${cntY}</div>
-    <div class="lbl">⚠ Auffällig</div>
-  </div>
-  <div class="stat-card stat-red">
-    <div class="num">${cntR}</div>
-    <div class="lbl">✗ Mangelhaft</div>
-  </div>
-  <div class="stat-card stat-grey">
-    <div class="num">${cntN}</div>
-    <div class="lbl">– Nicht bewertet</div>
-  </div>
-  <div class="gauge-card">
-    <div class="gauge-circle">${score}%</div>
-    <div class="gauge-lbl">IO-Quote<br>${cntG} / ${total}</div>
-  </div>
-</div>
-
-<!-- TABLE -->
-<div class="section-title">Fragenkatalog &amp; Bewertungen</div>
-<table>
-  <thead>
-    <tr>
-      <th class="nr">Nr.</th>
-      <th>Frage</th>
-      <th class="status">Bewertung</th>
-      <th class="comment">Kommentar</th>
-    </tr>
-  </thead>
-  <tbody>${rows}</tbody>
-</table>
-
-<!-- FOOTER -->
-<div class="page-footer">
-  <span>MKA Kurzaudit &nbsp;·&nbsp; ${escHtml(currentOU.name)} &nbsp;·&nbsp; ${escHtml(roleName)}</span>
-  <span>Erstellt am ${dateStr} um ${timeStr}</span>
-</div>
-
-<script>window.onload=function(){window.print();}<\/script>
-</body>
-</html>`;
-
-  // Toolbar in den Report einbauen (ersetzt auto-print, klappt in Chrome + Safari)
-  const reportHtml = html
-    .replace('<script>window.onload=function(){window.print();}<\/script>',
-      `<style>
-        #pdf-bar{
-          position:fixed;top:0;left:0;right:0;background:#1d2c45;
-          padding:10px 14px;display:flex;align-items:center;
-          justify-content:space-between;gap:8px;z-index:9999;
-          box-shadow:0 2px 8px rgba(0,0,0,.3);
+  function doCapture() {
+    const el = document.getElementById('screen-result');
+    html2canvas(el, {
+      backgroundColor: '#f0f2f7',
+      scale: 2,
+      useCORS: true,
+      logging: false
+    }).then(function(canvas) {
+      btn.innerHTML = orig;
+      btn.disabled = false;
+      canvas.toBlob(function(blob) {
+        var d   = new Date();
+        var ts  = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        var fn  = 'Kurzaudit_'+ts+'.png';
+        var file = new File([blob], fn, {type:'image/png'});
+        if(navigator.canShare && navigator.canShare({files:[file]})) {
+          navigator.share({files:[file], title:'MKA Kurzaudit'}).catch(function(){});
+        } else {
+          var url = URL.createObjectURL(blob);
+          var a   = document.createElement('a');
+          a.href  = url; a.download = fn; a.click();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
         }
-        #pdf-bar-hint{color:rgba(255,255,255,.7);font-family:-apple-system,sans-serif;font-size:12px;flex:1;}
-        .pb-btn{border:none;border-radius:8px;padding:9px 14px;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
-        .pb-print{background:#1a8a4a;color:#fff;}
-        body{padding-top:54px!important;}
-        @media print{#pdf-bar{display:none!important;}body{padding-top:0!important;}}
-      <\/style>
-      <div id="pdf-bar">
-        <span id="pdf-bar-hint">\u2B06 Tipp: Browser-Men\u00FC \"Teilen\" oder \"Drucken\" \u2192 Als PDF speichern</span>
-        <button class="pb-btn pb-print" onclick="window.print()">\uD83D\uDDA8 Drucken / PDF</button>
-      </div>
-      <script>if(typeof window.print==='function'&&!/CriOS|FxiOS/.test(navigator.userAgent)){window.onload=function(){setTimeout(function(){window.print();},400);}}<\/script>`
-    );
+      }, 'image/png');
+    }).catch(function() {
+      btn.innerHTML = orig;
+      btn.disabled  = false;
+      alert('Screenshot konnte nicht erstellt werden.');
+    });
+  }
 
-  const blob = new Blob([reportHtml], {type:'text/html;charset=utf-8'});
-  const blobUrl = URL.createObjectURL(blob);
-
-  const w = window.open(blobUrl, '_blank');
-
-  if (!w) {
-    const frame = document.createElement('iframe');
-    frame.id = 'mka-pdf-frame';
-    frame.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9998;border:none;background:#fff;';
-    frame.src = blobUrl;
-    document.body.appendChild(frame);
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '\u2715 Schlie\u00DFen';
-    closeBtn.style.cssText = 'position:fixed;top:10px;left:14px;z-index:9999;background:#c41e22;border:none;border-radius:8px;padding:9px 14px;color:#fff;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;cursor:pointer;';
-    closeBtn.onclick = function(){ frame.remove(); closeBtn.remove(); URL.revokeObjectURL(blobUrl); };
-    document.body.appendChild(closeBtn);
+  if(typeof html2canvas === 'undefined') {
+    var s    = document.createElement('script');
+    s.src    = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = doCapture;
+    s.onerror = function() {
+      btn.innerHTML = orig;
+      btn.disabled  = false;
+      alert('Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen.');
+    };
+    document.head.appendChild(s);
+  } else {
+    doCapture();
   }
 }
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1176,7 +953,7 @@ function renderTable() {
     lines.push(String(i+1)); lines.push(q); lines.push(st); lines.push(cf);
   });
   let tsv=lines.join('\n');
-  if(longC.length>0) tsv+='\nBemerkungen:  '+longC.map(c=>`(${c.nr}) ${c.text}`).join('  ');
+  tsv+='\nBemerkungen:  '+(longC.length>0 ? longC.map(c=>`(${c.nr}) ${c.text}`).join('  ') : '');
   const auditor  = (document.getElementById('auditor-select').value||'').trim();
   const auditee  = (document.getElementById('auditee-name-input').value||'').trim();
   const workplace= (document.getElementById('workplace-select').value||'').trim();
